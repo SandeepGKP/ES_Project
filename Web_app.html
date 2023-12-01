@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/onsenui/css/onsenui.css">
+    <script src="https://unpkg.com/onsenui/js/onsenui.js"></script>
+    <title>Sensor App</title>
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #mic_image {
+            width: 50px;
+        }
+        .column {
+            display: inline-block;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <ons-page>
+        <ons-toolbar>
+            <div class="center">Sensor App</div>
+        </ons-toolbar>
+
+        <ons-list>
+            <ons-list-item>
+                <div style="text-align: center;">
+                    <img id="mic_image" src="microphone.png" alt="Microphone">
+                </div>
+            </ons-list-item>
+            <ons-list-item>
+                <div id="result_label" style="text-align: center;">Recognized Text: </div>
+            </ons-list-item>
+            <ons-list-item>
+                <div id="firebase_data" style="text-align: center;">Firebase Data: </div>
+            </ons-list-item>
+        </ons-list>
+    </ons-page>
+
+    <script>
+        document.getElementById("mic_image").addEventListener("click", startSpeechRecognition);
+
+        function startSpeechRecognition() {
+            const recognition = new webkitSpeechRecognition();
+            recognition.onresult = function(event) {
+                const spokenText = event.results[0][0].transcript;
+                handleSpokenText(spokenText);
+            };
+
+            recognition.onerror = function(event) {
+                console.error("Speech recognition error:", event.error);
+                showErrorDialog("Speech recognition error");
+            };
+
+            recognition.start();
+        }
+
+        function handleSpokenText(spokenText) {
+            const resultLabel = document.getElementById("result_label");
+            resultLabel.innerText = "Recognized Text: " + spokenText;
+
+            if (spokenText.toLowerCase().includes("read data")) {
+                const dateCommand = getRequestedDate(spokenText);
+                readDataFromFirebase(dateCommand);
+            }
+        }
+
+        function getRequestedDate(spokenText) {
+            // Check if the spoken text contains a date command, e.g., "read data of 30 november 2023"
+            const dateRegex = /(\d{1,2}\s(?:january|february|march|april|may|june|july|august|september|october|november|december)\s\d{4})/i;
+            const match = spokenText.match(dateRegex);
+            
+            if (match) {
+                return match[0];
+            }
+
+            return null;
+        }
+
+        function readDataFromFirebase(dateCommand) {
+            const firebaseUrl = "https://sandeepfirstp-default-rtdb.firebaseio.com/sensor_data.json";
+
+            fetch(firebaseUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch data from Firebase. Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const firebaseDataElement = document.getElementById("firebase_data");
+                    firebaseDataElement.innerText = "";
+
+                    // Check if data is available
+                    if (!data) {
+                        firebaseDataElement.innerText = "Data unavailable in Firebase.";
+                        return;
+                    }
+
+                    // Display data in columns
+                    for (const key in data) {
+                        const columnElement = document.createElement("div");
+                        columnElement.classList.add("column");
+                        columnElement.innerText = `${key}: ${data[key]}`;
+                        firebaseDataElement.appendChild(columnElement);
+                    }
+                })
+                .catch(error => {
+                    console.error("Error reading data from Firebase:", error);
+                    showErrorDialog("Failed to fetch sensor data from Firebase.");
+                });
+        }
+
+        function showErrorDialog(message) {
+            ons.notification.alert(message);
+        }
+    </script>
+</body>
+</html>
